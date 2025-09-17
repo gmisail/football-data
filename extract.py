@@ -54,9 +54,9 @@ def main():
     league_year = os.environ.get("LEAGUE_YEAR") if "LEAGUE_YEAR" in os.environ else ""
 
     league = League(league_id=int(league_id or ""), year=int(league_year or ""), swid=swid, espn_s2=espn_s2)
+    current_week = league.current_week or 1
 
     conn = duckdb.connect()
-
     conn.sql("""
         create table team (
             id text primary key,
@@ -128,7 +128,7 @@ def main():
             )
 
     print("loading matches...")
-    for week in range(1, 3):
+    for week in range(1, current_week + 1):
         for box_score in league.box_scores(week):
             conn.execute(
                 """
