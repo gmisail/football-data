@@ -31,16 +31,17 @@ def ingest_player_performance(conn, week, team, lineup):
         conn.execute(
             """
                 insert into player_performance
-                values (?, ?, ?, ?, ?, ?, ?);
+                values (?, ?, ?, ?, ?, ?, ?, ?);
             """,
             [
                 week,
                 player.playerId,
                 team.team_id,
                 player.position,
-                player.lineupSlot == "BE",
+                player.lineupSlot == "BE" or player.lineupSlot == "IR",
                 player.points,
-                player.projected_points
+                player.projected_points,
+                player.injuryStatus in ["INJURY_RESERVE", "OUT"]
             ]
         )
 
@@ -98,6 +99,7 @@ def main():
             benched          boolean not null,
             actual_points    float not null,
             projected_points float not null,
+            injured          boolean not null,
 
             primary key (week, player_id)
         );

@@ -1,5 +1,10 @@
 import duckdb
 
+def print_label(msg):
+    print("#" * (len(msg) + 4))
+    print(f"# {msg} #")
+    print("#" * (len(msg) + 4))
+
 def main():
     conn = duckdb.connect()
     conn.sql("IMPORT DATABASE 'data'")
@@ -22,6 +27,7 @@ def main():
     #
     # Best performance
     #
+    print_label("BEST PERFORMANCE")
     conn.sql("""
         select
             t.name, pj.week, pj.differential
@@ -35,6 +41,7 @@ def main():
     #
     # Worst performance
     #
+    print_label("WORST PERFORMANCE")
     conn.sql("""
         select
             t.name, pj.week, pj.differential
@@ -48,6 +55,7 @@ def main():
     #
     # Most points for
     #
+    print_label("MOST POINTS FOR")
     conn.sql("""
         with team_score as (
             select
@@ -70,6 +78,7 @@ def main():
     #
     # Most points against
     #
+    print_label("MOST POINTS AGAINST")
     conn.sql("""
         select
             t.name,
@@ -116,6 +125,7 @@ def main():
     #
     # Closest game
     #
+    print_label("CLOSEST GAME")
     conn.sql("""
         select
             pd.*
@@ -129,6 +139,7 @@ def main():
     #
     # Biggest blowout
     #
+    print_label("BIGGEST BLOWOUT")
     conn.sql("""
         select
             pd.*
@@ -148,6 +159,7 @@ def main():
     #   Unlucky loser = a loser whose score is _above_ the median for that week. Unlike the above, they would have _won_ against
     #                   most other teams that week.
     #
+    print_label("MOST LUCKY WINS, UNLUCKY LOSSES")
     conn.sql("""
         with
             weekly_median as (
@@ -250,6 +262,7 @@ def main():
     #
     # Best bench performance
     #
+    print_label("BEST BENCH PERFORMANCE")
     conn.sql("""
         select
             t.name,
@@ -268,6 +281,7 @@ def main():
     #
     # Highest scoring bench
     #
+    print_label("HIGHEST SCORING BENCH")
     conn.sql("""
         with bench_perf as (
             select
@@ -289,16 +303,31 @@ def main():
     """).show()
 
     #
-    # Most efficient GM
+    # Most, least efficient GM
     #
-
-    #
-    # Least efficient GM
-    #
+    print_label("MOST, LEAST EFFICIENT GM")
+    conn.sql("""
+        select
+            t.name,
+            count(distinct sp.id) as outscored_starters
+        from
+            player_performance starter join player_performance bench on starter.week = bench.week and starter.team_id = bench.team_id and starter.position = bench.position
+                                       join player sp on starter.player_id = sp.id
+                                       join player bp on bench.player_id = bp.id
+                                       join team t on t.id = starter.team_id
+        where
+            bench.actual_points > starter.actual_points and
+            bench.benched = true and starter.benched = false
+        group by
+            t.name
+        order by
+            outscored_starters desc
+    """).show()
 
     #
     # Number of moves by team
     #
+    print_label("MOST, LEAST ROSTER MOVES")
     conn.sql("""
         select
             t.name,
@@ -309,6 +338,31 @@ def main():
             t.name
         order by
             num_moves desc
+    """).show()
+
+    #
+    # Most players who have been injured
+    #
+    print_label("MOST INJURED PLAYERS")
+    conn.sql("""
+        with most_injured as (
+            select
+                pp.team_id,
+                count(distinct pp.player_id) as num_injured
+            from
+                player_performance pp join player p on pp.player_id = p.id
+            where
+                pp.injured = TRUE
+            group by
+                pp.team_id
+        )
+        select
+            t.name,
+            num_injured
+        from
+            most_injured mi join team t on mi.team_id = t.id
+        order by
+            num_injured desc
     """).show()
 
 if __name__ == "__main__":
