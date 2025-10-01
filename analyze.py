@@ -367,6 +367,10 @@ def main():
             num_injured desc
     """).show()
 
+    #
+    # Calculate the number of wins that each team would have if their schedule
+    # were swapped with another team.
+    #
     print_label("NUMBER OF WINS IF SCHEDULES WERE SWAPPED")
     conn.sql("""
         with alternate_results_by_team as (
