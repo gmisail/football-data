@@ -1,15 +1,17 @@
 import duckdb
 
+
 def print_label(msg):
     print("#" * (len(msg) + 4))
     print(f"# {msg} #")
     print("#" * (len(msg) + 4))
 
+
 def main():
     conn = duckdb.connect()
-    conn.sql("IMPORT DATABASE 'data'")
+    _ = conn.sql("IMPORT DATABASE 'data'")
 
-    conn.sql("""
+    _ = conn.sql("""
         create table proj_point_differential as (
             select
                 box.week,
@@ -103,7 +105,7 @@ def main():
     #
     # Calculate point differentials for each match
     #
-    conn.sql("""
+    _ = conn.sql("""
         create table point_differential as (
             select
                 m.week,
@@ -364,6 +366,69 @@ def main():
         order by
             num_injured desc
     """).show()
+
+    print_label("NUMBER OF WINS IF SCHEDULES WERE SWAPPED")
+    conn.sql("""
+        with alternate_results_by_team as (
+            select distinct
+                m.week as week,
+                ta.id as team_id,
+                ta.name as team_name,
+                mta.actual_score as actual_score,
+
+                tb.id as other_schedule_team_id,
+                tb.name,
+
+                tc.id as opponent_id,
+                tc.name as opponent_name,
+
+                mtb.actual_score as opponent_score,
+                mta.actual_score > mtb.actual_score as is_win
+            from
+                team ta join team tb on ta.id != tb.id
+                        join match m on m.home_team_id = tb.id or m.away_team_id = tb.id
+                        join match_team mta on ta.id = mta.team_id and mta.week = m.week
+                        join match_team mtb on (
+                            mtb.team_id = case
+                                when m.home_team_id = tb.id then m.away_team_id
+                                else m.home_team_id
+                            end and
+                            mtb.week = m.week
+                        )
+                        join team tc on (
+                            tc.id = case
+                                when m.home_team_id = tb.id then m.away_team_id
+                                else m.home_team_id
+                            end
+                        )
+            where
+                mta.actual_score > 0.0 and mtb.actual_score > 0.0
+            order by
+                ta.name, tb.name, m.week
+        ),
+        alternate_reality as (
+            select
+                team_id,
+                other_schedule_team_id,
+                count(case when is_win then 1 end) as num_wins
+            from
+                alternate_results_by_team
+            group by
+                team_id, other_schedule_team_id
+            order by
+                num_wins desc
+        )
+        select
+            ta.name as target_team,
+            tb.name as other_schedule_team,
+            ar.num_wins
+        from
+            alternate_reality ar join team ta on ar.team_id = ta.id
+                                 join team tb on ar.other_schedule_team_id = tb.id
+        order by
+            num_wins desc, ta.name
+    """).show(max_rows=1000)
+
 
 if __name__ == "__main__":
     main()
